@@ -1,5 +1,7 @@
+bash
+
+cat > /home/claude/trading_bot/bot.py << 'EOF'
 import ccxt
-import pandas_ta as ta
 import pandas as pd
 import time
 import requests
@@ -56,6 +58,16 @@ def send_telegram_msg(text):
     return False
 
 
+def rsi(series, period=14):
+    delta = series.diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.ewm(com=period - 1, min_periods=period).mean()
+    avg_loss = loss.ewm(com=period - 1, min_periods=period).mean()
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
+
+
 def get_paxg_rsi():
     df_5m = pd.DataFrame(
         exchange.fetch_ohlcv(SYMBOL, '5m', limit=100),
@@ -65,9 +77,9 @@ def get_paxg_rsi():
         exchange.fetch_ohlcv(SYMBOL, '15m', limit=100),
         columns=['timestamp', 'open', 'high', 'low', 'close', 'volume']
     )
-    df_5m['rsi'] = ta.rsi(df_5m['close'], length=14)
-    df_15m['rsi'] = ta.rsi(df_15m['close'], length=14)
-    return round(df_5m['rsi'].iloc[-1], 2), round(df_15m['rsi'].iloc[-1], 2)
+    rsi_5m = round(rsi(df_5m['close']).iloc[-1], 2)
+    rsi_15m = round(rsi(df_15m['close']).iloc[-1], 2)
+    return rsi_5m, rsi_15m
 
 
 def get_xau_vwap():
@@ -75,11 +87,11 @@ def get_xau_vwap():
     if df.empty:
         return None, None
     df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
-    df['tp']  = (df['High'] + df['Low'] + df['Close']) / 3
+    df['tp'] = (df['High'] + df['Low'] + df['Close']) / 3
     df['tpv'] = df['tp'] * df['Volume']
     vwap = df['tpv'].cumsum() / df['Volume'].cumsum()
     xau_price = round(float(df['Close'].iloc[-1]), 2)
-    vwap_val  = round(float(vwap.iloc[-1]), 2)
+    vwap_val = round(float(vwap.iloc[-1]), 2)
     return vwap_val, xau_price
 
 
@@ -90,7 +102,6 @@ def run_bot():
         f"📊 RSI: PAXG/USDT (KuCoin)\n"
         f"📊 VWAP: XAU/USD (Yahoo Finance)\n"
         f"⏱ Timeframe: 5m + 15m\n"
-        f"📈 RSI 30/70 + VWAP filtresi\n"
         f"🕐 Aktif: 08:00 - 23:59 (Türkiye)\n"
         f"🕐 {now_tr().strftime('%H:%M:%S')}"
     )
@@ -141,7 +152,6 @@ def run_bot():
                     send_telegram_msg(msg)
                     last_alert = "sell"
 
-                # Nötr bölge — sıfırla
                 elif 45 < rsi_5m < 55:
                     last_alert = None
 
@@ -172,3 +182,8 @@ def run_bot():
 
 if __name__ == "__main__":
     run_bot()
+EOF
+Output
+
+exit code 0
+Done
