@@ -1,5 +1,5 @@
 ccxt
-pandas-ta
+pandas_ta
 pandas
 requests
 numpy
